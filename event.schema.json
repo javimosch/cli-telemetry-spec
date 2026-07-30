@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cli-specs.intrane.fr/cli-telemetry-spec/event.schema.json",
+  "title": "cli-telemetry-spec event",
+  "description": "The COMPLETE set of fields a conforming CLI may send. additionalProperties is false on purpose: this schema is the allow-list from PROTOCOL.md §3.1, and a validator rejecting an unknown field is the enforcement mechanism. Anything identifying is absent by construction, not by policy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tool", "version", "event", "os", "arch"],
+  "properties": {
+    "tool":       { "type": "string", "maxLength": 64, "description": "the tool's name" },
+    "version":    { "type": "string", "maxLength": 32 },
+    "event":      { "enum": ["install", "run", "error"] },
+    "verb":       { "type": "string", "maxLength": 32, "pattern": "^[a-z][a-z0-9_-]*$",
+                    "description": "a subcommand name from the tool's own fixed list. The pattern forbids spaces, so an argument cannot be smuggled in." },
+    "os":         { "type": "string", "maxLength": 16 },
+    "arch":       { "type": "string", "maxLength": 16 },
+    "exit_class": { "type": "integer", "enum": [0, 80, 90, 100, 110],
+                    "description": "the semantic exit-code class from cli-output-spec, never a message" },
+    "install_id": { "type": "string", "pattern": "^[0-9a-f]{8,32}$",
+                    "description": "OPTIONAL. Random at first run, never derived from the machine. Omitting it is the safer default." },
+    "ts":         { "type": "string", "format": "date-time" }
+  }
+}

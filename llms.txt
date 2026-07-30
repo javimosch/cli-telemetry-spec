@@ -1,0 +1,34 @@
+# cli-telemetry-spec
+
+An honest usage signal for agent-first CLIs: one POST, one `telemetry` verb, one
+allow-list of non-identifying fields, disclosed on stderr before anything is sent
+and disabled by a single environment variable.
+
+WHY: a CLI author cannot tell "nobody uses this" from "the install is broken".
+Downloads, clones and stars all report the same zero. Agent-operated tools have
+no human who will ever file an issue.
+
+READ IN THIS ORDER
+1. PROTOCOL.md      the normative contract (MUST/MUST NOT)
+2. event.schema.json  the allow-list, machine-checkable (additionalProperties: false)
+3. RECIPE.md        5 steps to implement it
+4. SKILL.md         drop-in skill for adding it to a CLI
+
+THE CONTRACT, COMPRESSED
+- disclose on stderr before the first send; never on stdout
+- honour <TOOL>_TELEMETRY=0 and DO_NOT_TRACK=1 BEFORE any network code runs
+- default OFF in CI
+- send only: tool, version, event(install|run|error), verb, os, arch,
+  exit_class, optional random install_id, ts
+- never send: hostname, username, paths, arguments, flag values, data, errors,
+  env, or any machine-derived id
+- never block, never retry, never change the exit code, never touch stdout
+- `<tool> telemetry` prints the REAL next payload, produced by the send path
+- collector aggregates; no IP logging, no profiles
+
+REFERENCE IMPLEMENTATION
+grange (https://github.com/javimosch/grange) — `grange telemetry`
+
+RELATED SPECS
+cli-output-spec, cli-guide-spec, cli-feedback-spec, cli-update-spec
+This is the fifth, and the only one that sends anything out. Adopt it last.

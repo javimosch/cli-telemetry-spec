@@ -55,6 +55,26 @@ non-interactive automation environment — `CI`, `CONTINUOUS_INTEGRATION`, or an
 `GITHUB_ACTIONS`/`GITLAB_CI`/`BUILDKITE`-style marker. CI runs are not users, and
 counting them inflates every number the author is trying to read.
 
+**2.2.1** CI is one instance of a broader rule: **automated fetch-and-run is not
+usage.** Audit tools, install checkers, mirrors, package scanners, uptime probes
+and container image builds all download a tool into a fresh environment and run
+it — which is indistinguishable, to a telemetry implementation, from a new
+machine being installed and used.
+
+Environment detection cannot catch these, because most of them set nothing. The
+obligation therefore runs BOTH ways:
+
+- **Tools** MUST honour `DO_NOT_TRACK` (§2.1), which is the only signal such a
+  harness can reliably send.
+- **Harnesses** that fetch and execute other people's binaries SHOULD set
+  `DO_NOT_TRACK=1` — and `<TOOL>_TELEMETRY=0` where the tool is known.
+
+This is not hypothetical. The reference implementation recorded **15 installs**,
+every one of them produced by the author's own install-audit script running on a
+schedule; the metric it existed to provide was entirely manufactured by the tool
+measuring it. Any counter of "machines" is really a counter of "fresh
+environments", and fresh environments are cheap to create by accident.
+
 **2.3** `<tool> telemetry --off` MUST persist the opt-out so it survives future
 runs, and MUST report that it did.
 
@@ -148,8 +168,13 @@ work completes and the result has been written, or in a detached best-effort
 manner.
 
 **5.5** The endpoint MUST be visible in `<tool> telemetry` output (§6) and
-SHOULD be overridable (`<TOOL>_TELEMETRY_URL`), so an organisation can point it
-at its own collector rather than disabling it.
+MUST be overridable via `<TOOL>_TELEMETRY_URL`, so an organisation can point it
+at its own collector rather than choosing between "on" and "off".
+
+The override was RECOMMENDED in the first version of this spec and is now
+required, because it is also what makes the tool auditable: a reviewer verifying
+that telemetry behaves as documented has to be able to aim it somewhere harmless.
+Without it, the only way to observe what a tool sends is to let it send.
 
 **5.6** The sender MUST NOT send events for a tool invocation that failed before
 the tool's own argument parsing (a crash before this spec's code runs is not an
@@ -212,6 +237,10 @@ be in the release notes, at the top.
 A tool conforms if:
 
 1. it discloses on stderr before the first send;
+1b. it honours `DO_NOT_TRACK` even when nothing else identifies the caller as
+   automation (§2.2.1) — verifiable from outside with
+   [stranger](https://github.com/javimosch/stranger), which asserts no outbound
+   connection is made when the switch is set;
 2. it honours `<TOOL>_TELEMETRY=0` and `DO_NOT_TRACK=1` before any network code;
 3. it defaults off in CI;
 4. it sends only allow-listed fields (validate against `event.schema.json`);

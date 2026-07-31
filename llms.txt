@@ -17,6 +17,12 @@ READ IN THIS ORDER
 THE CONTRACT, COMPRESSED
 - disclose on stderr before the first send; never on stdout
 - honour <TOOL>_TELEMETRY=0 and DO_NOT_TRACK=1 BEFORE any network code runs
+- automated fetch-and-run is NOT usage: audit tools, mirrors, scanners and image
+  builds all look like a fresh install. Tools must honour DO_NOT_TRACK; harnesses
+  that run other people's binaries must SET it. The reference implementation
+  recorded 15 installs that were all its author's own install-checker.
+- <TOOL>_TELEMETRY_URL is REQUIRED, not optional: without it the only way to see
+  what a tool sends is to let it send
 - default OFF in CI
 - send only: tool, version, event(install|run|error), verb, os, arch,
   exit_class, optional random install_id, ts

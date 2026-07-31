@@ -6,6 +6,13 @@
 //     func tel_tool()      (tstr) { tstr = "vigie" }        // lowercase tool name
 //     func tel_version()   (tstr) { tstr = app_version() }  // your version string
 //     func tel_envprefix() (tstr) { tstr = "VIGIE" }        // env var prefix
+//     func tel_opt_in()    (tyes) { tyes = 0 }               // 1 = opt-IN (§2.4)
+//     func tel_stderr(m)   { write(2, m) }                   // how YOU write stderr
+//
+// tel_stderr is host-supplied because a host may define its own `write`: MFL has
+// no namespaces, so machin-terminal's 3-argument write() shadowed the builtin
+// program-wide and this module would not compile ("write: expected 3 args, got
+// 2"). Disclosure must never depend on a name the host might already own.
 //
 // The return names are prefixed (tstr, tok, tyes...) on purpose: MFL infers a
 // name's type program-wide, so a module that claimed `yes` or `ok` would collide
@@ -95,8 +102,25 @@ func tel_truthy(tval) (tyes) {
 
 // tel_why names the reason telemetry is off. "Off, and I will not say why" is
 // not inspectable, and inspectability is what makes opt-out defensible.
+// tel_default_off: hosts MAY define `func tel_opt_in() (tyes) { tyes = 1 }` to
+// make telemetry opt-IN — disabled until the operator runs `<tool> telemetry
+// --telemetry-on` (spec §2.4). That is the right default for tools that handle
+// credentials, and for tools an operator installs on machines OTHER than their
+// own: roam is scp'd onto a VM and left running unattended, where a silent
+// phone-home is much harder to defend than from a CLI you invoke yourself.
+//
+// Hosts that do not define it get opt-out, the common case. MFL has no optional
+// functions, so the host always defines it — returning 0 for opt-out.
 func tel_why() (treason) {
     treason = "enabled"
+    if tel_opt_in() == 1 {
+        tdiro := tel_cfg_dir()
+        if len(tdiro) == 0 { treason = "opt-in: no config directory (HOME unset)"  return }
+        if len(read_file(tdiro + "/telemetry-on")) == 0 {
+            treason = "opt-in: off until `" + tel_tool() + " telemetry --telemetry-on`"
+            return
+        }
+    }
     if tel_truthy(env("DO_NOT_TRACK")) == 1 { treason = "DO_NOT_TRACK is set"  return }
     t := tel_env("TELEMETRY")
     if len(t) > 0 && tel_truthy(t) == 0 { treason = tel_envprefix() + "_TELEMETRY is off"  return }
@@ -146,9 +170,9 @@ func tel_notice() {
     tdir := tel_cfg_dir()
     if tel_mkdir_p(tdir) == 0 { return }
     write_file(tdir + "/telemetry-notice", "1")
-    write(2, "[telemetry] " + tel_tool() + " sends anonymous usage counts: version, os/arch, which verb\n")
-    write(2, "[telemetry] ran, and whether it failed. No identity, arguments, paths or your data.\n")
-    write(2, "[telemetry] Exact payload: `" + tel_tool() + " telemetry`. Disable: " + tel_envprefix() + "_TELEMETRY=0\n")
+    tel_stderr("[telemetry] " + tel_tool() + " sends anonymous usage counts: version, os/arch, which verb\n")
+    tel_stderr("[telemetry] ran, and whether it failed. No identity, arguments, paths or your data.\n")
+    tel_stderr("[telemetry] Exact payload: `" + tel_tool() + " telemetry`. Disable: " + tel_envprefix() + "_TELEMETRY=0\n")
 }
 
 // machin's https_post has no timeout, so the send races a sleep: the caller
@@ -213,10 +237,19 @@ func tel_set(on) (tdata, tok) {
     tok = 1
     tdir := tel_cfg_dir()
     if on == 1 {
-        if len(tdir) > 0 { remove(tdir + "/telemetry-off") }
+        if len(tdir) > 0 {
+            remove(tdir + "/telemetry-off")
+            // opt-in hosts need a positive marker, not just the absence of a
+            // negative one
+            if tel_opt_in() == 1 {
+                tel_mkdir_p(tdir)
+                write_file(tdir + "/telemetry-on", "1")
+            }
+        }
         tdata = "{\"enabled\":true,\"reason\":\"enabled\"}"
         return
     }
+    if tel_opt_in() == 1 && len(tdir) > 0 { remove(tdir + "/telemetry-on") }
     if len(tdir) == 0 {
         tok = 0
         tdata = "{\"error\":\"HOME is unset, so the opt-out cannot be persisted; use " + tel_envprefix() + "_TELEMETRY=0\"}"

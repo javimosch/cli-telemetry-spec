@@ -250,3 +250,22 @@ A tool conforms if:
 
 A tool that cannot satisfy §3.2 for its domain SHOULD ship no telemetry at all.
 **No signal is better than a signal that costs the user's trust.**
+
+### 8.1 When not to adopt this at all
+
+Two tools in the reference estate were instrumented and then **reverted**, which
+is worth recording because "adopt it everywhere" is the wrong instinct:
+
+- One cross-compiles to four platforms with `zig cc`. Telemetry needs an HTTPS
+  POST, HTTPS pulls in OpenSSL, and zig could not resolve `libssl`/`libcrypto`
+  for those targets. The choice was four platforms or a usage number, and it is
+  a build-time tool that runs mostly in CI — precisely what §2.2 excludes — so
+  the signal would have been the weakest in the estate at the highest cost.
+- One is a GUI application that binds POSIX `write(2)` through FFI. MFL has no
+  namespaces, so that shadows the only builtin capable of writing to stderr, and
+  §1.1 requires the disclosure to go there. Unshadowing it meant editing the
+  PTY write path of a program that cannot be tested without a display.
+
+The general rule: **if telemetry costs the tool a capability its users actually
+have — a platform, a channel, a guarantee — the tool keeps the capability.** A
+usage counter is a convenience for the author; the capability is the product.

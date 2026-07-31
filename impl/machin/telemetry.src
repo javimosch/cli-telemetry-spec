@@ -232,6 +232,30 @@ func tel_set(on) (tdata, tok) {
     tdata = "{\"enabled\":false,\"reason\":\"disabled by `" + tel_tool() + " telemetry --off`\"}"
 }
 
+// tel_verb_from_args: for hosts whose command functions EXIT rather than return,
+// so there is no post-dispatch line to hook. Their single output function (the
+// one that prints and exits) is the correct insertion point instead — it runs
+// after the result is written, which is exactly where the spec wants the report
+// — but it does not know which verb ran. This reads it back from argv.
+func tel_verb_from_args() (tstr) {
+    tstr = "none"
+    a := args()
+    if len(a) > 1 { tstr = a[1] }
+}
+
+// tel_hasflag: hosts parse flags in wildly different ways (some have a helper,
+// some loop inline, some have none), and the telemetry verb needs exactly one
+// flag check. Providing it here means adopting the module never depends on the
+// host's argument conventions.
+func tel_hasflag(a, name) (tyes) {
+    tyes = 0
+    i := 0
+    while i < len(a) {
+        if a[i] == name { tyes = 1 }
+        i = i + 1
+    }
+}
+
 // The inspection verb's body. Prints the REAL next payload from the same builder
 // tel_send uses, so a reviewer verifies rather than trusts.
 func tel_status_json() (tjson) {
